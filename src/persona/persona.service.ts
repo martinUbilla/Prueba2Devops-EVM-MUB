@@ -1,31 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 import { CreatePersonaDto } from './dto/create-persona.dto';
-import { Persona } from './entities/persona.entity';
 
 @Injectable()
 export class PersonaService {
-  private personas: Persona[] = [];
-  private nextId = 1;
+  constructor(private readonly prisma: PrismaService) {}
 
-  create(createPersonaDto: CreatePersonaDto): Persona {
-    const persona: Persona = {
-      id: this.nextId++,
-      ...createPersonaDto,
-    };
-    this.personas.push(persona);
-    return persona;
+  async create(createPersonaDto: CreatePersonaDto) {
+    return this.prisma.persona.create({ data: createPersonaDto });
   }
 
-  findAll(): Persona[] {
-    return this.personas;
+  async findAll() {
+    return this.prisma.persona.findMany();
   }
 
-  remove(id: number): Persona {
-    const index = this.personas.findIndex((p) => p.id === id);
-    if (index === -1) {
+  async remove(id: number) {
+    const persona = await this.prisma.persona.findUnique({ where: { id } });
+    if (!persona) {
       throw new NotFoundException(`Persona con id ${id} no encontrada`);
     }
-    const [removed] = this.personas.splice(index, 1);
-    return removed;
+    return this.prisma.persona.delete({ where: { id } });
   }
 }

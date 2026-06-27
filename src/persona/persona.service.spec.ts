@@ -1,13 +1,27 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
 import { PersonaService } from './persona.service';
+import { PrismaService } from '../prisma/prisma.service';
+
+const prismaMock = {
+  persona: {
+    create: jest.fn(),
+    findMany: jest.fn(),
+    findUnique: jest.fn(),
+    delete: jest.fn(),
+  },
+};
 
 describe('PersonaService', () => {
   let service: PersonaService;
 
   beforeEach(async () => {
+    jest.clearAllMocks();
     const module: TestingModule = await Test.createTestingModule({
-      providers: [PersonaService],
+      providers: [
+        PersonaService,
+        { provide: PrismaService, useValue: prismaMock },
+      ],
     }).compile();
 
     service = module.get<PersonaService>(PersonaService);
@@ -18,7 +32,7 @@ describe('PersonaService', () => {
   });
 
   describe('create', () => {
-    it('should create a persona and return it with an id', () => {
+    it('should create a persona and return it', async () => {
       const dto = {
         nombre: 'Juan Pérez',
         rut: '12345678-9',
@@ -26,98 +40,68 @@ describe('PersonaService', () => {
         ciudad: 'Santiago',
         gustos: ['pizza', 'fútbol'],
       };
-      const result = service.create(dto);
-      expect(result).toMatchObject({ ...dto, id: 1 });
+      const expected = { id: 1, ...dto };
+      prismaMock.persona.create.mockResolvedValue(expected);
+
+      const result = await service.create(dto);
+      expect(result).toEqual(expected);
+      expect(prismaMock.persona.create).toHaveBeenCalledWith({ data: dto });
     });
 
-    it('should assign incremental ids', () => {
+    it('should call prisma.persona.create with the dto data', async () => {
       const dto = {
         nombre: 'Ana López',
         rut: '98765432-1',
         fechaNacimiento: '1995-05-20',
         ciudad: 'Valparaíso',
-        gustos: ['lectura', 'senderismo'],
+        gustos: ['lectura'],
       };
-      service.create(dto);
-      const second = service.create(dto);
-      expect(second.id).toBe(2);
-    });
+      prismaMock.persona.create.mockResolvedValue({ id: 2, ...dto });
 
-    it('should persist the persona with gustos in memory', () => {
-      const dto = {
-        nombre: 'Pedro Soto',
-        rut: '11111111-1',
-        fechaNacimiento: '1985-03-10',
-        ciudad: 'Concepción',
-        gustos: ['videojuegos', 'música'],
-      };
-      service.create(dto);
-      expect(service.findAll()[0].gustos).toEqual(['videojuegos', 'música']);
+      await service.create(dto);
+      expect(prismaMock.persona.create).toHaveBeenCalledTimes(1);
     });
   });
 
   describe('findAll', () => {
-    it('should return an empty array when no personas exist', () => {
-      expect(service.findAll()).toEqual([]);
+    it('should return an empty array when no personas exist', async () => {
+      prismaMock.persona.findMany.mockResolvedValue([]);
+      const result = await service.findAll();
+      expect(result).toEqual([]);
     });
 
-    it('should return all created personas including gustos', () => {
-      service.create({
-        nombre: 'María González',
-        rut: '22222222-2',
-        fechaNacimiento: '2000-07-04',
-        ciudad: 'La Serena',
-        gustos: ['cocina', 'viajes'],
-      });
-      service.create({
-        nombre: 'Carlos Muñoz',
-        rut: '33333333-3',
-        fechaNacimiento: '1978-11-30',
-        ciudad: 'Antofagasta',
-        gustos: ['fotografía'],
-      });
-      expect(service.findAll()).toHaveLength(2);
-      expect(service.findAll()[0].gustos).toContain('cocina');
+    it('should return all personas from the database', async () => {
+      const personas = [
+        { id: 1, nombre: 'María', rut: '22222222-2', fechaNacimiento: '2000-07-04', ciudad: 'La Serena', gustos: ['cocina'] },
+        { id: 2, nombre: 'Carlos', rut: '33333333-3', fechaNacimiento: '1978-11-30', ciudad: 'Antofagasta', gustos: [] },
+      ];
+      prismaMock.persona.findMany.mockResolvedValue(personas);
+      const result = await service.findAll();
+      expect(result).toHaveLength(2);
+      expect(result[0].gustos).toContain('cocina');
     });
   });
 
   describe('remove', () => {
-    it('should remove a persona by id and return it', () => {
-      const dto = {
-        nombre: 'Lucía Ramírez',
-        rut: '44444444-4',
-        fechaNacimiento: '1992-09-25',
-        ciudad: 'Temuco',
-        gustos: ['pintura', 'yoga'],
-      };
-      const created = service.create(dto);
-      const removed = service.remove(created.id);
-      expect(removed).toMatchObject(dto);
-      expect(service.findAll()).toHaveLength(0);
+    it('should remove a persona and return it', async () => {
+      const persona = { id: 1, nombre: 'Pedro', rut: '11111111-1', fechaNacimiento: '1985-03-10', ciudad: 'Concepción', gustos: ['música'] };
+      prismaMock.persona.findUnique.mockResolvedValue(persona);
+      prismaMock.persona.delete.mockResolvedValue(persona);
+
+      const result = await service.remove(1);
+      expect(result).toEqual(persona);
+      expect(prismaMock.persona.delete).toHaveBeenCalledWith({ where: { id: 1 } });
     });
 
-    it('should throw NotFoundException when id does not exist', () => {
-      expect(() => service.remove(999)).toThrow(NotFoundException);
+    it('should throw NotFoundException when persona does not exist', async () => {
+      prismaMock.persona.findUnique.mockResolvedValue(null);
+      await expect(service.remove(999)).rejects.toThrow(NotFoundException);
     });
 
-    it('should only remove the persona with the given id', () => {
-      const p1 = service.create({
-        nombre: 'Roberto Vega',
-        rut: '55555555-5',
-        fechaNacimiento: '1988-06-12',
-        ciudad: 'Iquique',
-        gustos: ['surf', 'pesca'],
-      });
-      service.create({
-        nombre: 'Sofía Castro',
-        rut: '66666666-6',
-        fechaNacimiento: '2003-02-28',
-        ciudad: 'Rancagua',
-        gustos: ['manga', 'programación'],
-      });
-      service.remove(p1.id);
-      expect(service.findAll()).toHaveLength(1);
-      expect(service.findAll()[0].rut).toBe('66666666-6');
+    it('should not call delete if persona is not found', async () => {
+      prismaMock.persona.findUnique.mockResolvedValue(null);
+      await expect(service.remove(999)).rejects.toThrow(NotFoundException);
+      expect(prismaMock.persona.delete).not.toHaveBeenCalled();
     });
   });
 });
