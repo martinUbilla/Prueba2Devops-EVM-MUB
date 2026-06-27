@@ -3,4 +3,5 @@ export class CreatePersonaDto {
   rut: string;
   fechaNacimiento: string;
   ciudad: string;
+  gustos: string[];
 }

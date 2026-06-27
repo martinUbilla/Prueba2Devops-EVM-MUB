@@ -24,6 +24,7 @@ describe('PersonaService', () => {
         rut: '12345678-9',
         fechaNacimiento: '1990-01-15',
         ciudad: 'Santiago',
+        gustos: ['pizza', 'fútbol'],
       };
       const result = service.create(dto);
       expect(result).toMatchObject({ ...dto, id: 1 });
@@ -35,21 +36,23 @@ describe('PersonaService', () => {
         rut: '98765432-1',
         fechaNacimiento: '1995-05-20',
         ciudad: 'Valparaíso',
+        gustos: ['lectura', 'senderismo'],
       };
       service.create(dto);
       const second = service.create(dto);
       expect(second.id).toBe(2);
     });
 
-    it('should persist the persona in memory', () => {
+    it('should persist the persona with gustos in memory', () => {
       const dto = {
         nombre: 'Pedro Soto',
         rut: '11111111-1',
         fechaNacimiento: '1985-03-10',
         ciudad: 'Concepción',
+        gustos: ['videojuegos', 'música'],
       };
       service.create(dto);
-      expect(service.findAll()).toHaveLength(1);
+      expect(service.findAll()[0].gustos).toEqual(['videojuegos', 'música']);
     });
   });
 
@@ -58,20 +61,23 @@ describe('PersonaService', () => {
       expect(service.findAll()).toEqual([]);
     });
 
-    it('should return all created personas', () => {
+    it('should return all created personas including gustos', () => {
       service.create({
         nombre: 'María González',
         rut: '22222222-2',
         fechaNacimiento: '2000-07-04',
         ciudad: 'La Serena',
+        gustos: ['cocina', 'viajes'],
       });
       service.create({
         nombre: 'Carlos Muñoz',
         rut: '33333333-3',
         fechaNacimiento: '1978-11-30',
         ciudad: 'Antofagasta',
+        gustos: ['fotografía'],
       });
       expect(service.findAll()).toHaveLength(2);
+      expect(service.findAll()[0].gustos).toContain('cocina');
     });
   });
 
@@ -82,6 +88,7 @@ describe('PersonaService', () => {
         rut: '44444444-4',
         fechaNacimiento: '1992-09-25',
         ciudad: 'Temuco',
+        gustos: ['pintura', 'yoga'],
       };
       const created = service.create(dto);
       const removed = service.remove(created.id);
@@ -99,12 +106,14 @@ describe('PersonaService', () => {
         rut: '55555555-5',
         fechaNacimiento: '1988-06-12',
         ciudad: 'Iquique',
+        gustos: ['surf', 'pesca'],
       });
       service.create({
         nombre: 'Sofía Castro',
         rut: '66666666-6',
         fechaNacimiento: '2003-02-28',
         ciudad: 'Rancagua',
+        gustos: ['manga', 'programación'],
       });
       service.remove(p1.id);
       expect(service.findAll()).toHaveLength(1);
